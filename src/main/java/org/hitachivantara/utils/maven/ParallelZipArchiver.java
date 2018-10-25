@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2018 by Hitachi Vantara
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
 package org.hitachivantara.utils.maven;
 
 import org.apache.commons.io.IOUtils;
@@ -118,18 +133,20 @@ public class ParallelZipArchiver extends ZipArchiver {
         @Override public Integer call() throws Exception {
           Path path = zipfs.getPath( vPath );
 
-          if ( !isFile && !isFilesonly() && getIncludeEmptyDirs()) {
+          if ( !isFile && !isFilesonly() && getIncludeEmptyDirs() ) {
             Files.createDirectories( path );
           }
 
-          if (isFile) {
+          if ( isFile ) {
             Path nf = path.getParent();
             if ( nf != null && Files.notExists( nf ) ) {
               Files.createDirectories( nf );
             }
 
             InputStream inputStream;
-            OutputStream outputStream = Files.newOutputStream( path, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING );
+            OutputStream outputStream = Files
+              .newOutputStream( path, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING );
 
             if ( !isSymlink ) {
               inputStream = entry.getInputStream();
@@ -138,7 +155,7 @@ public class ParallelZipArchiver extends ZipArchiver {
             }
 
             try {
-              ByteBuffer buf = ByteBuffer.allocateDirect( 1024*256 ); //256K
+              ByteBuffer buf = ByteBuffer.allocateDirect( 1024 * 256 ); //256K
               ReadableByteChannel inChannel = Channels.newChannel( inputStream );
               WritableByteChannel outChannel = Channels.newChannel( outputStream );
               while ( inChannel.read( buf ) >= 0 || buf.position() != 0 ) {
@@ -147,7 +164,7 @@ public class ParallelZipArchiver extends ZipArchiver {
                 buf.compact();
               }
 
-//              IOUtils.copyLarge( inputStream, outputStream, new byte[8196] );
+              //              IOUtils.copyLarge( inputStream, outputStream, new byte[8196] );
             } finally {
               inputStream.close();
               outputStream.close();
