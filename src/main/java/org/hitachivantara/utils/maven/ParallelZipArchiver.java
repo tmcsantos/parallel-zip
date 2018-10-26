@@ -15,7 +15,6 @@
  */
 package org.hitachivantara.utils.maven;
 
-import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.archiver.ArchiveEntry;
 import org.codehaus.plexus.archiver.Archiver;
 import org.codehaus.plexus.archiver.ArchiverException;
@@ -163,8 +162,6 @@ public class ParallelZipArchiver extends ZipArchiver {
                 outChannel.write( buf );
                 buf.compact();
               }
-
-              //              IOUtils.copyLarge( inputStream, outputStream, new byte[8196] );
             } finally {
               inputStream.close();
               outputStream.close();
@@ -199,9 +196,9 @@ public class ParallelZipArchiver extends ZipArchiver {
         }
         executorService.shutdown();
         executorService
-          .awaitTermination( 1000 * 60l, TimeUnit.SECONDS ); // == Infinity. We really *must* wait for this to complete
+          .awaitTermination( 1000 * 60L, TimeUnit.SECONDS ); // == Infinity. We really *must* wait for this to complete
       } catch ( InterruptedException e ) {
-        throw new IOException( "InterruptedException exception", e.getCause() );
+        throw new IOException( "Interrupted exception", e.getCause() );
       } catch ( ExecutionException e ) {
         throw new IOException( "Execution exception", e.getCause() );
       }
