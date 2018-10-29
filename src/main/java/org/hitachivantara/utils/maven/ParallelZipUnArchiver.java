@@ -13,6 +13,8 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
+
 package org.hitachivantara.utils.maven;
 
 import org.codehaus.plexus.archiver.ArchiverException;
@@ -73,6 +75,11 @@ public class ParallelZipUnArchiver extends ZipUnArchiver {
       Iterable<Path> rootPaths = zipfs.getRootDirectories();
       for ( final Path path : rootPaths ) {
         Files.walkFileTree( path, new SimpleFileVisitor<Path>() {
+          @Override public FileVisitResult preVisitDirectory( Path dir, BasicFileAttributes attrs ) throws IOException {
+            extractFile( dir, path );
+            return FileVisitResult.CONTINUE;
+          }
+
           @Override public FileVisitResult visitFile( Path file, BasicFileAttributes attrs ) throws IOException {
             extractFile( file, path );
             return FileVisitResult.CONTINUE;
@@ -126,8 +133,12 @@ public class ParallelZipUnArchiver extends ZipUnArchiver {
         // Make sure that we conserve the hierarchy of files and folders inside the zip
         Path relativePathInZip = root.relativize( file );
         Path targetPath = destDirectory.toPath().resolve( relativePathInZip.toString() );
-        Files.createDirectories( targetPath.getParent() );
+        if (Files.isDirectory( file )) {
+          Files.createDirectories( targetPath );
+          return 0;
+        }
 
+        Files.createDirectories( targetPath.getParent() );
         InputStream inputStream = Files.newInputStream( file, StandardOpenOption.READ );
         OutputStream outputStream = Files
           .newOutputStream( targetPath, StandardOpenOption.WRITE, StandardOpenOption.CREATE,

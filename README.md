@@ -1,4 +1,4 @@
-# Lib for replacing default zipping implementation in maven-assembly-plugin [EXPERIMENTAL]
+# Lib for replacing default zipping implementation in maven-(assembly/dependency)-plugin [EXPERIMENTAL]
 
 Uses java nio and native zip provider
 
@@ -18,6 +18,16 @@ Place this in you pom.xml and activate with `-Dexperimental`
     <plugins>
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
+        <dependencies>
+          <dependency>
+            <groupId>org.hitachivantara.utils</groupId>
+            <artifactId>parallel-zip</artifactId>
+            <version>1.0-SNAPSHOT</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <plugin>
+        <artifactId>maven-dependency-plugin</artifactId>
         <dependencies>
           <dependency>
             <groupId>org.hitachivantara.utils</groupId>
