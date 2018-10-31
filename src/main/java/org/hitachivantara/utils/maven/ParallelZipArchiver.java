@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 
 @Component( role = Archiver.class, hint = "zip" )
 public class ParallelZipArchiver extends ZipArchiver {
@@ -59,7 +60,7 @@ public class ParallelZipArchiver extends ZipArchiver {
   private FileSystem zipfs;
   private File zipFile;
   private ExecutorService executorService;
-  private final List<Future<Integer>> futures = new ArrayList<>();
+  private List<Future<Integer>> futures = new ArrayList<>();
 
 
   public ParallelZipArchiver() {
@@ -98,7 +99,7 @@ public class ParallelZipArchiver extends ZipArchiver {
     addResources( iter );
   }
 
-  protected final void addResources( ResourceIterator resources ) throws IOException {
+  protected final void addResources( @Nonnull ResourceIterator resources ) throws IOException {
     ArchiveEntry entry;
     String name;
     while ( resources.hasNext() ) {
@@ -196,6 +197,7 @@ public class ParallelZipArchiver extends ZipArchiver {
         for ( final Future<?> future : futures ) {
           future.get();
         }
+        futures = null;
         executorService.shutdown();
         executorService
           .awaitTermination( 1000 * 60L, TimeUnit.SECONDS ); // == Infinity. We really *must* wait for this to complete

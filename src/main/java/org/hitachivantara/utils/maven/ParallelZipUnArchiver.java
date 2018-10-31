@@ -14,13 +14,12 @@
  *    limitations under the License.
  */
 
-
 package org.hitachivantara.utils.maven;
 
 import org.codehaus.plexus.archiver.ArchiverException;
 import org.codehaus.plexus.archiver.UnArchiver;
-import org.codehaus.plexus.archiver.zip.ZipUnArchiver;
 import org.codehaus.plexus.component.annotations.Component;
+import org.codehaus.plexus.components.io.fileselectors.FileInfo;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,38 +49,42 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-@Component( role = UnArchiver.class, hint = "zip")
-public class ParallelZipUnArchiver extends ZipUnArchiver {
+@Component( role = UnArchiver.class, hint = "zip" )
+public class ParallelZipUnArchiver extends AbstractParallelZipUnArchiver {
 
   private FileSystem zipfs;
-  private File zipFile;
-  private File destDirectory;
   private ExecutorService executorService;
-  private final List<Future<Integer>> futures = new ArrayList<>();
-
+  private List<Future<Integer>> futures = new ArrayList<>();
 
   public ParallelZipUnArchiver() {
     this.executorService = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
   }
 
+  public ParallelZipUnArchiver( File sourceFile ) {
+    super( sourceFile );
+    this.executorService = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
+  }
+
   @Override protected void execute() throws ArchiverException {
-    zipFile = getSourceFile();
-    destDirectory = getDestDirectory();
+    File zipFile = getSourceFile();
+    File destDirectory = getDestDirectory();
     getLogger().info( "Using concurrent ZIP unpacking with Java NIO" );
     getLogger().debug( "Expanding " + zipFile + " into " + destDirectory );
 
     try {
-      createZipFileSystem();
+      zipfs = createZipFileSystem();
       Iterable<Path> rootPaths = zipfs.getRootDirectories();
       for ( final Path path : rootPaths ) {
         Files.walkFileTree( path, new SimpleFileVisitor<Path>() {
           @Override public FileVisitResult preVisitDirectory( Path dir, BasicFileAttributes attrs ) throws IOException {
-            extractFile( dir, path );
+            FileInfo fileInfo = new ZipEntryFileInfo( dir, path );
+            extractFile( fileInfo );
             return FileVisitResult.CONTINUE;
           }
 
           @Override public FileVisitResult visitFile( Path file, BasicFileAttributes attrs ) throws IOException {
-            extractFile( file, path );
+            FileInfo fileInfo = new ZipEntryFileInfo( file, path );
+            extractFile( fileInfo );
             return FileVisitResult.CONTINUE;
           }
         } );
@@ -89,21 +92,21 @@ public class ParallelZipUnArchiver extends ZipUnArchiver {
     } catch ( IOException ioe ) {
       throw new ArchiverException( "Error while expanding " + zipFile.getAbsolutePath(), ioe );
     }
-
     close();
   }
 
   @Override protected void execute( String path, File outputDirectory ) throws ArchiverException {
-    zipFile = getSourceFile();
+    File zipFile = getSourceFile();
 
     try {
-      createZipFileSystem();
+      zipfs = createZipFileSystem();
       Path p = zipfs.getPath( path );
-      extractFile( p, p );
+      FileInfo fileInfo = new ZipEntryFileInfo( p, outputDirectory.toPath() );
+      extractFile( fileInfo );
     } catch ( IOException e ) {
       throw new ArchiverException( "Error while expanding " + zipFile.getAbsolutePath(), e );
     }
-
+    close();
   }
 
   private void close() throws ArchiverException {
@@ -113,10 +116,11 @@ public class ParallelZipUnArchiver extends ZipUnArchiver {
         for ( final Future<?> future : futures ) {
           future.get();
         }
-        executorService.shutdown();
-        executorService
-          .awaitTermination( 1000 * 60L, TimeUnit.SECONDS ); // == Infinity. We really *must* wait for this to complete
       }
+      executorService.shutdown();
+      executorService
+        .awaitTermination( 1000 * 60L, TimeUnit.SECONDS ); // == Infinity. We really *must* wait for this to complete
+      futures = null;
       zipfs.close();
     } catch ( InterruptedException e ) {
       throw new ArchiverException( "Interrupted exception", e.getCause() );
@@ -127,19 +131,21 @@ public class ParallelZipUnArchiver extends ZipUnArchiver {
     }
   }
 
-  private void extractFile( final Path file, final Path root ) {
+  private void extractFile( final FileInfo fileInfo ) {
     futures.add( executorService.submit( new Callable<Integer>() {
       @Override public Integer call() throws Exception {
-        // Make sure that we conserve the hierarchy of files and folders inside the zip
-        Path relativePathInZip = root.relativize( file );
-        Path targetPath = destDirectory.toPath().resolve( relativePathInZip.toString() );
-        if (Files.isDirectory( file )) {
+        if (!isSelected( fileInfo )) {
+          return 0;
+        }
+
+        Path targetPath = getDestDirectory().toPath().resolve( fileInfo.getName() );
+        if ( fileInfo.isDirectory() ) {
           Files.createDirectories( targetPath );
           return 0;
         }
 
         Files.createDirectories( targetPath.getParent() );
-        InputStream inputStream = Files.newInputStream( file, StandardOpenOption.READ );
+        InputStream inputStream = fileInfo.getContents();
         OutputStream outputStream = Files
           .newOutputStream( targetPath, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
             StandardOpenOption.TRUNCATE_EXISTING );
@@ -163,14 +169,43 @@ public class ParallelZipUnArchiver extends ZipUnArchiver {
     } ) );
   }
 
-  private void createZipFileSystem() throws IOException {
+  private FileSystem createZipFileSystem() throws IOException {
     // setup ZipFileSystem
     Map<String, Object> env = new HashMap<>();
     env.put( "create", "false" );
     env.put( "encoding", "UTF8" );
-    //    env.put( "useTempFile", Boolean.TRUE );
-    URI zipURI = URI.create( String.format( "jar:file:%s", zipFile.getPath() ) );
-    zipfs = FileSystems.newFileSystem( zipURI, env );
+    URI zipURI = URI.create( String.format( "jar:file:%s", getSourceFile().getPath() ) );
+    return FileSystems.newFileSystem( zipURI, env );
   }
 
+  private static class ZipEntryFileInfo implements FileInfo {
+    private Path zipEntry;
+    private Path rootPath;
+
+    public ZipEntryFileInfo(Path zipEntry, Path root) {
+      this.zipEntry = zipEntry;
+      this.rootPath = root;
+    }
+
+    @Override public String getName() {
+      // Make sure that we conserve the hierarchy of files and folders inside the zip
+      return rootPath.relativize( zipEntry ).toString();
+    }
+
+    @Override public InputStream getContents() throws IOException {
+      return Files.newInputStream( zipEntry, StandardOpenOption.READ );
+    }
+
+    @Override public boolean isFile() {
+      return Files.isRegularFile( zipEntry );
+    }
+
+    @Override public boolean isDirectory() {
+      return Files.isDirectory( zipEntry );
+    }
+
+    @Override public boolean isSymbolicLink() {
+      return Files.isSymbolicLink( zipEntry );
+    }
+  }
 }
