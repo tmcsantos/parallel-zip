@@ -28,6 +28,9 @@ public class HVArchiverManager extends DefaultArchiverManager {
     if ( "zip".equals( archiverName ) ) {
       archiverName = "parallel-zip";
     }
+    if ( "dir".equals( archiverName ) ) {
+      archiverName = "parallel-dir";
+    }
     return super.getArchiver( archiverName );
   }
 
