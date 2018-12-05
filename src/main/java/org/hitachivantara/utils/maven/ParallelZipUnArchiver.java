@@ -174,7 +174,7 @@ public class ParallelZipUnArchiver extends AbstractParallelZipUnArchiver {
     Map<String, Object> env = new HashMap<>();
     env.put( "create", "false" );
     env.put( "encoding", "UTF8" );
-    URI zipURI = URI.create( String.format( "jar:file:%s", getSourceFile().getPath() ) );
+    URI zipURI = URI.create( String.format( "jar:file:%s", getSourceFile().toURI().getPath() ) );
     return FileSystems.newFileSystem( zipURI, env );
   }
 

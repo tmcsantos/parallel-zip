@@ -186,7 +186,7 @@ public class ParallelZipArchiver extends ZipArchiver {
     env.put( "create", "true" );
     env.put( "encoding", getEncoding() );
     env.put( "useTempFile", Boolean.TRUE );
-    URI zipURI = URI.create( String.format( "jar:file:%s", zipFile.getPath() ) );
+    URI zipURI = URI.create( String.format( "jar:file:%s", zipFile.toURI().getPath() ) );
     zipfs = FileSystems.newFileSystem( zipURI, env );
   }
 
