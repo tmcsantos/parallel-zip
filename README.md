@@ -4,7 +4,7 @@ Uses java nio and native zip provider
 
 ##### How to use
  
-Place this in you pom.xml and activate with `-Dexperimental`
+Place this in your pom.xml and activate with `-Dexperimental`
 
 ```
 <profile>
